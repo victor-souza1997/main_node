@@ -40,6 +40,7 @@
 // WiFi credentials: should match your access point!
 #define STATION_SSID "AP_405"
 #define STATION_PASSWORD "mercuryHg100"
+#define HOSTNAME "MQTT_Bridge"
 
 const char *serverName = "https://us-east-1.aws.webhooks.mongodb-realm.com/api/client/v2.0/app/temperature_analysis-gjbaa/service/temperatura/incoming_webhook/api?secret=10minute";
 
@@ -56,37 +57,10 @@ IPAddress getlocalIP();
 IPAddress myIP(0, 0, 0, 0);
 IPAddress myAPIP(0, 0, 0, 0);
 
-// topic's suffix: everyone can publish/subscribe to this public broker,
-// you have to change the following 2 defines
-#define PUBPLISHSUFFIX "painlessMesh/from/"
-#define SUBSCRIBESUFFIX "painlessMesh/to/"
-
-#define PUBPLISHFROMGATEWAYSUFFIX PUBPLISHSUFFIX "gateway"
-
-#define CHECKCONNDELTA 60 // check interval ( seconds ) for mqtt connection
-
-// TFT start
-#ifndef TFT_DISPOFF
-#define TFT_DISPOFF 0x28
-#endif
-
-#ifndef TFT_SLPIN
-#define TFT_SLPIN 0x10
-#endif
-
-#define TFT_MOSI 19
-#define TFT_SCLK 18
-#define TFT_CS 5
-#define TFT_DC 16
-#define TFT_RST 23
-
-#define TFT_BL 4  // Display backlight control pin
 #define ADC_EN 14 // ADC_EN is the ADC detection enable port
 #define ADC_PIN 34
 #define BUTTON_1 35
 #define BUTTON_2 0
-#define TFT_BACKLIGHT_ON 0
-TFT_eSPI tft = TFT_eSPI(135, 240); // Invoke custom library
 // TFT end
 Button2 btn1(BUTTON_1);
 Button2 btn2(BUTTON_2);
@@ -98,31 +72,27 @@ char buff[512];
 uint32_t nexttime = 0;
 uint8_t initialized = 0;
 
-StaticJsonDocument<500> doc; // <- a little more than 200 bytes in the stack
+StaticJsonDocument<500> doc; // json variable to send to database
 
 // Task taskSendMessage( TASK_SECOND * 1 , TASK_FOREVER, &sendMessage );
 
-void POSTData()
+void POSTData() // post data in DB
 {
 
-  if (WiFi.status() == WL_CONNECTED)
+  if (WiFi.status() == WL_CONNECTED) // check wifi connection
   {
-    HTTPClient http;
+    HTTPClient http; // create http object
 
-    http.begin(serverName);
-    http.addHeader("Content-Type", "application/json");
-
-    String json;
-    serializeJson(doc, json);
-
-    Serial.println(json);
-    int httpResponseCode = http.POST(json);
+    http.begin(serverName);                             // start http object
+    http.addHeader("Content-Type", "application/json"); // add header to the message
+    String json;                                        // variable to print json content
+    serializeJson(doc, json);                           // convert json into string
+    Serial.println(json);                               // print string content
+    int httpResponseCode = http.POST(json);             // post and get retuned message
     Serial.print("resposta:");
     Serial.println(httpResponseCode);
   }
 }
-
-// Needed for painless library
 
 // messages received from painless mesh network
 void receivedCallback(const uint32_t &from, const String &msg)
@@ -131,11 +101,7 @@ void receivedCallback(const uint32_t &from, const String &msg)
   doc["sensor"]["temperature"] = msg.c_str();
   doc["dispositivo"]["id"] = from;
 
-  String topic = PUBPLISHSUFFIX + String(from);
   POSTData();
-
-  // Serial.println(topic);
-  // mqttClient.publish(topic.c_str(), msg.c_str());
 }
 void newConnectionCallback(uint32_t nodeId)
 {
@@ -159,7 +125,6 @@ void changedConnectionCallback()
   calc_delay = true;
 
   sprintf(buff, "Nodes:%d", nodes.size());
-  tft.drawString(buff, 0, 32);
 }
 void nodeTimeAdjustedCallback(int32_t offset)
 {
@@ -180,27 +145,6 @@ String scanprocessor(const String &var)
 void setup()
 {
   Serial.begin(115200);
-
-  // TFT
-  tft.init();
-  tft.setRotation(1);
-  tft.fillScreen(TFT_BLACK);
-  // tft.setTextSize(4);
-  tft.setTextColor(TFT_GREEN, TFT_BLACK);
-  tft.setCursor(0, 0);
-  tft.setTextDatum(MC_DATUM);
-  tft.setTextSize(2);
-
-  if (TFT_BL > 0)
-  {                                         // TFT_BL has been set in the TFT_eSPI library in the User Setup file TTGO_T_Display.h
-    pinMode(TFT_BL, OUTPUT);                // Set backlight pin to output mode
-    digitalWrite(TFT_BL, TFT_BACKLIGHT_ON); // Turn backlight on. TFT_BACKLIGHT_ON has been set in the TFT_eSPI library in the User Setup file TTGO_T_Display.h
-  }
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextDatum(TL_DATUM);
-  tft.drawString("MqttBridge 1.0.0", 0, 0);
-  // tft.setTextDatum(MC_DATUM);
-  // tft.drawString("LeftButton:", tft.width() / 2, tft.height() / 2 - 16);
 
   // mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | MSG_TYPES | REMOTE ); // all types on except GENERAL
   // mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
@@ -251,7 +195,6 @@ void setup()
   mesh.initOTAReceive("bridge");
 
   sprintf(buff, "Id:%d", mesh.getNodeId());
-  tft.drawString(buff, 0, 16);
 }
 void loop()
 {
@@ -262,7 +205,6 @@ void loop()
   {
     myIP = getlocalIP();
     Serial.println("My IP is " + myIP.toString());
-    tft.drawString("Ip:" + myIP.toString(), 0, 80);
     initialized = 1;
   }
 }
