@@ -122,7 +122,7 @@ IPAddress getlocalIP()
 void receivedCallback(uint32_t from, String &msg)
 {
   Serial.printf("bridge: Received from %u msg=%s\n", from, msg.c_str());
-  String topic = PUBPLISHSUFFIX + String(from);
+  String topic = PUBPLISHSUFFIX + String("sensor"); //+ String(from);
   mqttClient.publish(topic.c_str(), msg.c_str());
 }
 
